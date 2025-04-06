@@ -1,0 +1,11 @@
+name: DevroomTrial
+version: '1.0-SNAPSHOT'
+main: me.ikevoodoo.devroomtrial.DevroomTrial
+api-version: '1.21'
+authors: [ IkeVoodoo ]
+description: Fast Random
+
+commands:
+  region:
+    description: Command to handle regions
+    permission: region.menu
