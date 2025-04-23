@@ -3,6 +3,7 @@ package me.ikevoodoo.devroomtrial.menus.renderers;
 import me.ikevoodoo.devroomtrial.api.regions.Region;
 import me.ikevoodoo.devroomtrial.api.regions.SelectionManager;
 import me.ikevoodoo.devroomtrial.menus.Menu;
+import me.ikevoodoo.devroomtrial.menus.MenuPage;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -15,6 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -122,12 +124,15 @@ public class RegionMenuRenderer implements MenuRenderer {
     }
 
     private void startConversation(Menu menu, Player player, Prompt prompt) {
-        menu.closeTemporarily(player);
+        final var queue = menu.saveHistory(player);
+        queue.removeLast(); // We will reopen the page anyway
+        menu.closeAll(player);
 
         final var plugin = JavaPlugin.getProvidingPlugin(this.getClass());
 
         final var conversation = new ConversationFactory(plugin)
-                .withFirstPrompt(prompt)
+                .withFirstPrompt(new RestoreQueuePrompt(prompt, menu, player, queue))
+                .withEscapeSequence("cancel")
                 .withPrefix(new PluginNameConversationPrefix(plugin, " >> ", ChatColor.GOLD))
                 .withLocalEcho(false)
                 .buildConversation(player);
@@ -147,6 +152,31 @@ public class RegionMenuRenderer implements MenuRenderer {
         stack.setItemMeta(meta);
 
         return stack;
+    }
+
+    private record RestoreQueuePrompt(Prompt delegate, Menu menu, Player player, Deque<MenuPage> queue) implements Prompt {
+
+        @Override
+        public @NotNull String getPromptText(@NotNull ConversationContext context) {
+            return this.delegate.getPromptText(context);
+        }
+
+        @Override
+        public boolean blocksForInput(@NotNull ConversationContext context) {
+            return this.delegate.blocksForInput(context);
+        }
+
+        @Override
+        public @Nullable Prompt acceptInput(@NotNull ConversationContext context, @Nullable String input) {
+            final var result = this.delegate.acceptInput(context, input);
+            if (result == Prompt.END_OF_CONVERSATION) {
+                this.menu.restoreHistory(this.player, this.queue);
+                return Prompt.END_OF_CONVERSATION;
+            }
+
+            return result;
+        }
+
     }
 
     private static class WhitelistPrompt extends ValidatingPrompt {

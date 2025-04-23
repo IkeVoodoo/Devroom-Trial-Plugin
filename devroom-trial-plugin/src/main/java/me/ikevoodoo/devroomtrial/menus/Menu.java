@@ -19,7 +19,6 @@ public class Menu {
 
     private final Map<UUID, Deque<MenuPage>> viewers = new HashMap<>();
     private final Set<UUID> transitioning = new HashSet<>();
-    private final Set<UUID> tempCloses = new HashSet<>();
     private final Map<String, Integer> pageGroupCounters = new HashMap<>();
     private final Map<String, MenuPage> pagesByName = new LinkedHashMap<>();
 
@@ -45,12 +44,6 @@ public class Menu {
         return this.viewers.getOrDefault(player.getUniqueId(), new ArrayDeque<>()).peekLast();
     }
 
-    public void closeTemporarily(@NotNull final Player player) {
-        this.tempCloses.add(player.getUniqueId());
-
-        player.closeInventory();
-    }
-
     public void closeAll(@NotNull final Player player) {
         final var uuid = player.getUniqueId();
         this.viewers.remove(uuid);
@@ -58,16 +51,30 @@ public class Menu {
         player.closeInventory();
     }
 
+    public void startTransitioning(@NotNull final Player player) {
+        this.transitioning.add(player.getUniqueId());
+    }
+
+    public void stopTransitioning(@NotNull final Player player) {
+        this.transitioning.remove(player.getUniqueId());
+    }
+
+    public boolean isTransitioning(@NotNull final Player player) {
+        return this.transitioning.contains(player.getUniqueId());
+    }
+
+    public Deque<MenuPage> saveHistory(@NotNull final Player player) {
+        return new ArrayDeque<>(this.viewers.getOrDefault(player.getUniqueId(), new ArrayDeque<>()));
+    }
+
+    public void restoreHistory(@NotNull final Player player, @NotNull final Deque<MenuPage> queue) {
+        final var existing = this.viewers.computeIfAbsent(player.getUniqueId(), id -> new ArrayDeque<>());
+
+        queue.descendingIterator().forEachRemaining(existing::addFirst);
+    }
+
     public void close(@NotNull final Player player) {
         final var uuid = player.getUniqueId();
-
-        if (this.tempCloses.contains(uuid)) {
-            return;
-        }
-
-        if (this.transitioning.remove(uuid)) {
-            return;
-        }
 
         final var open = this.viewers.get(uuid);
         if (open == null) {
@@ -78,8 +85,11 @@ public class Menu {
 
         final var previous = open.peekLast();
         if (previous != null) {
-            this.transitioning.add(uuid);
-            Bukkit.getScheduler().runTaskLater(JavaPlugin.getProvidingPlugin(this.getClass()), () -> previous.open(this, player), 1);
+            Bukkit.getScheduler().runTaskLater(JavaPlugin.getProvidingPlugin(this.getClass()), () -> {
+                this.startTransitioning(player);
+                previous.open(this, player);
+                this.stopTransitioning(player);
+            }, 1);
             return;
         }
 
@@ -159,15 +169,13 @@ public class Menu {
 
         final var existing = this.viewers.computeIfAbsent(uuid, unused -> new ArrayDeque<>());
 
-        if (!this.tempCloses.remove(uuid)) {
-            if (!existing.isEmpty()) {
-                this.transitioning.add(uuid);
-            }
+        existing.addLast(page);
 
-            existing.addLast(page);
-        }
-
-        Bukkit.getScheduler().runTaskLater(JavaPlugin.getProvidingPlugin(this.getClass()), () -> page.open(this, player), 1);
+        Bukkit.getScheduler().runTaskLater(JavaPlugin.getProvidingPlugin(this.getClass()), () -> {
+            this.startTransitioning(player);
+            page.open(this, player);
+            this.stopTransitioning(player);
+        }, 1);
         return true;
     }
 

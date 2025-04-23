@@ -53,6 +53,10 @@ public class PlayerMenuListener implements Listener {
             return;
         }
 
+        if (this.menu.isTransitioning(player)) {
+            return;
+        }
+
         this.menu.close(player);
     }
 

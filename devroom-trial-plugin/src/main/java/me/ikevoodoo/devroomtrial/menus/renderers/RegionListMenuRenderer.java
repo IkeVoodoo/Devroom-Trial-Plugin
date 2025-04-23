@@ -2,7 +2,6 @@ package me.ikevoodoo.devroomtrial.menus.renderers;
 
 import me.ikevoodoo.devroomtrial.api.regions.Region;
 import me.ikevoodoo.devroomtrial.api.regions.RegionManager;
-import me.ikevoodoo.devroomtrial.api.whitelist.Whitelist;
 import me.ikevoodoo.devroomtrial.menus.Menu;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
